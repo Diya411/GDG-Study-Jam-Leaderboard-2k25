@@ -31,7 +31,6 @@ body {
 header {
   text-align:center;
   margin-bottom:24px;
-  position:relative;
 }
 header h1 {
   font-size:48px;
@@ -147,7 +146,7 @@ footer {
   </header>
 
   <section class="controls">
-    <input id="search" placeholder="Search by name or branchYear...">
+    <input id="search" placeholder="Search by name...">
     <select id="filterType">
       <option value="">All Participants</option>
       <option value="19 Badges">19 Badges</option>
@@ -160,60 +159,63 @@ footer {
     <div id="cards" class="cards"></div>
   </main>
 
-  <footer>Made with by Divya Gurav 💟</footer>
+  <footer>Made with 💟 by Divya Gurav</footer>
 </div>
 
 <script>
-// 🎊 Confetti Blast at Start
+// 🎊 Confetti Blast
 function launchConfetti() {
   const duration = 2 * 1000;
   const end = Date.now() + duration;
-
   (function frame() {
-    confetti({
-      particleCount: 4,
-      angle: 60,
-      spread: 70,
-      origin: { x: 0 },
-    });
-    confetti({
-      particleCount: 4,
-      angle: 120,
-      spread: 70,
-      origin: { x: 1 },
-    });
+    confetti({ particleCount: 4, angle: 60, spread: 70, origin: { x: 0 } });
+    confetti({ particleCount: 4, angle: 120, spread: 70, origin: { x: 1 } });
     if (Date.now() < end) requestAnimationFrame(frame);
   })();
 }
 launchConfetti();
 
-let participants = [];
-
-// ✅ Use your Google Sheet ID and Sheet Name
+// ✅ Google Sheet Info
 const SHEET_ID = "1QvZMz72QfvGKskO6mImJ6SbsC74W8A-RW3TNFyvJlts";
 const SHEET_NAME = "Sheet2";
 const API_URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
+
+let participants = [];
 
 fetch(API_URL)
   .then(res => res.json())
   .then(data => {
     participants = data.map(row => {
-      const name = row["User Name"]?.trim() || "Unknown";
-      const branchYear = row["BranchYear"]?.trim() || "Unknown";
-      const badges = parseInt(row["No of Badges Completed"] || 0);
-      const games = parseInt(row["# of Arcade Games Completed"] || 0);
-      const types = [];
-      if (badges >= 19) types.push("19 Badges");
-      if (games > 0) types.push("Arcade Game");
-      const badgeType = types.join(", ") || "Other";
+      // 🧹 Normalize all column names (remove spaces/newlines)
+      const cleaned = {};
+      for (const key in row) {
+        cleaned[key.trim()] = row[key];
+      }
+
+      const name = (cleaned["User Name"] || "").trim() || "Unknown";
+
+      // 🧾 Extract numbers safely
+      const badgeStr = String(cleaned["# of Skill Badges Completed"] || "0").replace(/[^\d]/g, "");
+      const gameStr  = String(cleaned["# of Arcade Games Completed"] || "0").replace(/[^\d]/g, "");
+
+      const badges = parseInt(badgeStr || "0", 10);
+      const games  = parseInt(gameStr || "0", 10);
+
+      // 🏷️ Correct badge logic
+      let badgeType = "";
+      if (badges >= 19 && games > 0) badgeType = "19 Badges, Arcade Game";
+      else if (badges >= 19) badgeType = "19 Badges";
+      else if (games > 0) badgeType = "Arcade Game";
+      else badgeType = "Other";
+
       return {
         name,
-        branchYear,
         badgeType,
         hasBadges: badges >= 19,
         hasArcade: games > 0
       };
     });
+
     renderList();
   })
   .catch(err => {
@@ -222,26 +224,30 @@ fetch(API_URL)
       `<div class="no-results">⚠️ Error loading data. Make sure the Google Sheet is public.</div>`;
   });
 
+// UI Elements
 const searchEl = document.getElementById("search");
 const filterEl = document.getElementById("filterType");
 const resetEl = document.getElementById("reset");
 const cardsEl = document.getElementById("cards");
 
+// Helpers
 function initials(name) {
-  return name.split(" ").map(n => n[0]).slice(0,2).join("").toUpperCase();
+  return name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
 }
 function avatarColor(name) {
   const colors = ['#FCE8E6','#E8F3FF','#E8FFF0','#FFF7DE','#F0E8FF'];
   let sum = 0;
-  for (let i=0; i<name.length; i++) sum += name.charCodeAt(i);
+  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
   return colors[sum % colors.length];
 }
 
+// Rendering
 function renderList() {
   const q = searchEl.value.trim().toLowerCase();
   const filter = filterEl.value;
+
   let filtered = participants.filter(p => {
-    const matchQ = p.name.toLowerCase().includes(q) || p.branchYear.toLowerCase().includes(q);
+    const matchQ = p.name.toLowerCase().includes(q);
     const matchF =
       filter === "19 Badges" ? p.hasBadges :
       filter === "Arcade Game" ? p.hasArcade :
@@ -259,17 +265,18 @@ function renderList() {
       <div class="avatar" style="background:${avatarColor(p.name)}">${initials(p.name)}</div>
       <div>
         <div class="name">${p.name}</div>
-        <div class="meta">${p.branchYear} • ${p.badgeType}</div>
+        <div class="meta">${p.badgeType}</div>
       </div>
     </div>
   `).join('');
 }
 
-searchEl.addEventListener("input", debounce(renderList,150));
+// Event Listeners
+searchEl.addEventListener("input", debounce(renderList, 150));
 filterEl.addEventListener("change", renderList);
 resetEl.addEventListener("click", () => {
-  searchEl.value="";
-  filterEl.value="";
+  searchEl.value = "";
+  filterEl.value = "";
   renderList();
 });
 
@@ -283,4 +290,3 @@ function debounce(fn, wait) {
 </script>
 </body>
 </html>
-
